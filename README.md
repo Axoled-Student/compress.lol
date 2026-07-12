@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-007808?style=flat&logo=ffmpeg&logoColor=white)](https://ffmpeg.org/)
 
-> **Compress.lol** – _"Crushing file sizes, not dreams"_ ⚡  
+> **Compress.lol** – _"Crushing file sizes, not dreams"_ ⚡
 > WebAssembly-powered video compression that runs entirely in your browser.
 
 ---
