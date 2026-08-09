@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#ff3b3b" />
-  <meta name="description" content="Client-side video compression with FFmpeg.wasm, 500 MB input support, and custom target sizes." />
+  <meta name="description" content="Client-side video compression with FFmpeg.wasm, targets up to 500 MB, and custom target sizes." />
   <title>Compress.lol Pages Edition</title>
   <link rel="stylesheet" href="./styles.css" />
   <script>
@@ -29,7 +29,7 @@
       <div>
         <p class="eyebrow">GitHub Pages edition</p>
         <h1>Compress.lol</h1>
-        <p class="subtitle">Browser-only video compression with 500 MB input support and custom output targets.</p>
+        <p class="subtitle">Browser-only video compression with targets up to 500 MB and custom output sizes.</p>
       </div>
       <div class="pill">No uploads to a server</div>
     </header>
@@ -37,7 +37,7 @@
     <section class="grid">
       <article class="card">
         <h2>1. Choose a video</h2>
-        <p class="muted">Maximum input size: 500 MB. The source file stays on your device.</p>
+        <p class="muted">Source videos up to 5 GB are accepted. The file stays on your device.</p>
         <label class="file-picker" for="videoInput">
           <span id="filePickerTitle">Select video</span>
           <span id="filePickerMeta">MP4, MOV, MKV, WebM, AVI and more</span>
@@ -109,7 +109,7 @@
     </section>
 
     <section class="notes">
-      <p><strong>Large-file note:</strong> the input is mounted with WORKERFS so a 500 MB source does not need to be duplicated into FFmpeg’s in-memory filesystem. The compressed output still uses browser/WASM memory, so very large target outputs require substantial free RAM.</p>
+      <p><strong>Large-file note:</strong> the source is mounted with WORKERFS so it is not duplicated into FFmpeg’s in-memory filesystem. The compressed output still uses browser/WASM memory, so targets near 500 MB require substantial free RAM.</p>
       <p>Target size is approximate because this Pages build uses a single-pass bitrate calculation for speed.</p>
     </section>
   </main>
