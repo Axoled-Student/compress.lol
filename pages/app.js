@@ -4,7 +4,7 @@ import { toBlobURL } from './vendor/util/index.js';
 await window.__coiReady;
 
 const MB = 1024 * 1024;
-const MAX_INPUT_BYTES = 500 * MB;
+const MAX_INPUT_BYTES = 5 * 1024 * MB;
 const MAX_TARGET_MB = 500;
 
 const els = {
@@ -152,7 +152,7 @@ async function selectFile(file) {
   }
   if (file.size > MAX_INPUT_BYTES) {
     els.videoInput.value = '';
-    showError(`This Pages edition supports source files up to 500 MB. Selected file: ${formatBytes(file.size)}.`);
+    showError(`This Pages edition supports source files up to 5 GB. Selected file: ${formatBytes(file.size)}.`);
     return;
   }
 
