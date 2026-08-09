@@ -39,6 +39,7 @@ let selectedFile = null;
 let metadata = null;
 let targetMode = '25';
 let outputBytes = null;
+let passthroughOriginal = false;
 let processing = false;
 
 function formatBytes(bytes) {
@@ -92,15 +93,45 @@ function validateTarget(showMessage = false) {
   let message = '';
   if (!Number.isFinite(targetMB) || targetMB < 1 || targetMB > MAX_TARGET_MB) {
     message = 'Target size must be between 1 MB and 500 MB.';
-  } else if (selectedFile && targetMB * MB >= selectedFile.size) {
-    message = `Choose a target smaller than the source file (${formatBytes(selectedFile.size)}).`;
   }
   if (showMessage && message) showError(message);
   return !message;
 }
 
+function isAlreadyUnderTarget() {
+  const targetMB = getTargetMB();
+  return !!selectedFile && Number.isFinite(targetMB) && selectedFile.size <= targetMB * MB;
+}
+
+function resetResult() {
+  outputBytes = null;
+  passthroughOriginal = false;
+  els.result.classList.add('hidden');
+  els.progressWrap.classList.add('hidden');
+  els.downloadButton.textContent = 'Download MP4';
+}
+
 function updateActionState() {
-  els.compressButton.disabled = processing || !ffmpegReady || !selectedFile || !metadata || !validateTarget(false);
+  const validTarget = validateTarget(false);
+  const needsCompression = !!selectedFile && validTarget && !isAlreadyUnderTarget();
+  els.compressButton.disabled =
+    processing ||
+    !selectedFile ||
+    !metadata ||
+    !validTarget ||
+    (needsCompression && (!ffmpegReady || !ffmpeg));
+  els.compressButton.textContent = isAlreadyUnderTarget() ? 'Use original file' : 'Compress video';
+}
+
+function updateTargetStatus() {
+  if (processing || !selectedFile || !metadata || !validateTarget(false)) return;
+  if (isAlreadyUnderTarget()) {
+    setStatus(`Already under the ${getTargetMB()} MB target. No recompression needed.`);
+  } else if (ffmpegReady) {
+    setStatus('Ready to compress.');
+  } else {
+    setStatus('FFmpeg is still loading…');
+  }
 }
 
 function updateTargetUI() {
@@ -112,6 +143,7 @@ function updateTargetUI() {
   }
   clearError();
   updateActionState();
+  updateTargetStatus();
 }
 
 async function readVideoMetadata(file) {
@@ -139,9 +171,7 @@ async function readVideoMetadata(file) {
 
 async function selectFile(file) {
   clearError();
-  outputBytes = null;
-  els.result.classList.add('hidden');
-  els.progressWrap.classList.add('hidden');
+  resetResult();
 
   if (!file) {
     selectedFile = null;
@@ -171,7 +201,7 @@ async function selectFile(file) {
     metadata = await readVideoMetadata(file);
     els.metaDuration.textContent = formatDuration(metadata.duration);
     els.metaResolution.textContent = metadata.width && metadata.height ? `${metadata.width}×${metadata.height}` : 'Unknown';
-    setStatus(ffmpegReady ? 'Ready to compress.' : 'FFmpeg is still loading…');
+    updateTargetStatus();
   } catch (error) {
     metadata = null;
     showError(error instanceof Error ? error.message : 'Unable to read video metadata.');
@@ -201,11 +231,33 @@ async function cleanupFFmpeg(inputDir) {
 }
 
 async function compress() {
-  if (!selectedFile || !metadata || !ffmpegReady || !ffmpeg || processing) return;
+  if (!selectedFile || !metadata || processing) return;
   clearError();
   if (!validateTarget(true)) return;
 
   const targetMB = getTargetMB();
+  const targetBytes = targetMB * MB;
+
+  if (selectedFile.size <= targetBytes) {
+    resetResult();
+    passthroughOriginal = true;
+    els.resultSize.textContent = formatBytes(selectedFile.size);
+    els.savedPercent.textContent = 'No recompression';
+    els.downloadButton.textContent = 'Download original';
+    els.result.classList.remove('hidden');
+    setStatus(
+      `Already under ${targetMB} MB (${formatBytes(selectedFile.size)}). No recompression was needed.`
+    );
+    updateActionState();
+    return;
+  }
+
+  if (!ffmpegReady || !ffmpeg) {
+    setStatus('FFmpeg is still loading…');
+    updateActionState();
+    return;
+  }
+
   let bitrates;
   try {
     bitrates = calculateBitrates(targetMB, metadata.duration);
@@ -216,7 +268,9 @@ async function compress() {
 
   processing = true;
   outputBytes = null;
+  passthroughOriginal = false;
   els.result.classList.add('hidden');
+  els.downloadButton.textContent = 'Download MP4';
   els.compressButton.disabled = true;
   setProgress(0, 'Mounting source video…');
   setStatus(`Compressing toward ${targetMB} MB…`);
@@ -271,13 +325,25 @@ async function compress() {
 }
 
 function download() {
-  if (!outputBytes || !selectedFile) return;
-  const blob = new Blob([outputBytes], { type: 'video/mp4' });
+  if (!selectedFile) return;
+
+  let blob;
+  let filename;
+
+  if (passthroughOriginal) {
+    blob = selectedFile;
+    filename = selectedFile.name;
+  } else {
+    if (!outputBytes) return;
+    blob = new Blob([outputBytes], { type: 'video/mp4' });
+    const stem = selectedFile.name.replace(/\.[^.]+$/, '') || 'video';
+    filename = `${stem}-compressed-${getTargetMB()}MB.mp4`;
+  }
+
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  const stem = selectedFile.name.replace(/\.[^.]+$/, '') || 'video';
   link.href = url;
-  link.download = `${stem}-compressed-${getTargetMB()}MB.mp4`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -286,13 +352,19 @@ function download() {
 
 els.videoInput.addEventListener('change', () => selectFile(els.videoInput.files?.[0] || null));
 els.presetGrid.addEventListener('click', (event) => {
+  if (processing) return;
   const button = event.target.closest('.preset');
   if (!button) return;
   targetMode = button.dataset.mb;
+  resetResult();
   updateTargetUI();
   if (targetMode === 'custom') els.customTarget.focus();
 });
-els.customTarget.addEventListener('input', updateTargetUI);
+els.customTarget.addEventListener('input', () => {
+  if (processing) return;
+  resetResult();
+  updateTargetUI();
+});
 els.compressButton.addEventListener('click', compress);
 els.downloadButton.addEventListener('click', download);
 
@@ -317,7 +389,11 @@ async function loadFFmpeg() {
       workerURL: await toBlobURL('./ffmpeg/ffmpeg-core.worker.js', 'text/javascript')
     });
     ffmpegReady = true;
-    setStatus(selectedFile && metadata ? 'Ready to compress.' : 'FFmpeg ready. Choose a video.');
+    if (selectedFile && metadata) {
+      updateTargetStatus();
+    } else {
+      setStatus('FFmpeg ready. Choose a video.');
+    }
   } catch (error) {
     console.error(error);
     showError('FFmpeg failed to load. Refresh the page once; if it still fails, try a Chromium-based desktop browser.');
