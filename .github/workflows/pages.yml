@@ -1,0 +1,68 @@
+name: Deploy 500MB compressor to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pages/**'
+      - 'static/ffmpeg/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install browser runtime dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Assemble static Pages artifact
+        run: |
+          rm -rf dist-pages
+          mkdir -p dist-pages/vendor/ffmpeg dist-pages/vendor/util
+          cp pages/index.html pages/app.js pages/styles.css pages/coi-serviceworker.js dist-pages/
+          cp -R static/ffmpeg dist-pages/ffmpeg
+          cp -R node_modules/@ffmpeg/ffmpeg/dist/esm/. dist-pages/vendor/ffmpeg/
+          cp -R node_modules/@ffmpeg/util/dist/esm/. dist-pages/vendor/util/
+          touch dist-pages/.nojekyll
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist-pages
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
